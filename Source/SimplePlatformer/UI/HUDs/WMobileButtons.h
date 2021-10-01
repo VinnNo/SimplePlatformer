@@ -39,31 +39,17 @@ public:
 		class UImage* ActionBImage = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buttons", meta = (BindWidget))
-		class UImage* ActionBSupportImage = nullptr;
+		class UTextBlock* ActionASupportText = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buttons", meta = (BindWidget))
-		class UImage* ActionASupportImage = nullptr;
+		class UTextBlock* ActionBSupportText = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player")
 		class ACharacterBase* PlayerCharacter = nullptr;
 
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indicators")
 		TEnumAsByte<EInteractionTypes::Type> InteractionType;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indicators")
-		UTexture2D* OpenTexture = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indicators")
-		UTexture2D* GrabTexture = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indicators")
-		UTexture2D* ThrowTexture = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indicators")
-		UTexture2D* DropTexture = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Indicators")
-		UTexture2D* CancelTexture = nullptr;
 
 	virtual void NativeConstruct() override;
 

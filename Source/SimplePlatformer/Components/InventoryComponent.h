@@ -6,6 +6,19 @@
 #include "Components/ActorComponent.h"
 #include "InventoryComponent.generated.h"
 
+UENUM(BlueprintType)
+namespace EEquipmentStates
+{
+	enum Type
+	{
+		None     UMETA(DisplayName = "None"),
+		Sword    UMETA(DisplayName = "Sword"),
+		Shield   UMETA(DisplayName = "Shield"),
+		SandS    UMETA(DisplayName = "Sword And Shield"),
+	};
+}
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FCurrentEquipmentChanged);
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class SIMPLEPLATFORMER_API UInventoryComponent : public UActorComponent
@@ -15,6 +28,12 @@ class SIMPLEPLATFORMER_API UInventoryComponent : public UActorComponent
 public:	
 	// Sets default values for this component's properties
 	UInventoryComponent();
+
+
+	FCurrentEquipmentChanged OnCurrentEquipmentChanged;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Equipment")
+		TEnumAsByte<EEquipmentStates::Type> CurrentEquipment;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Invetory")
 		TArray<FString> SmallKeys;
@@ -39,5 +58,5 @@ public:
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-		
+	void SetCurrentEquipment(EEquipmentStates::Type Equipment);
 };

@@ -32,3 +32,32 @@ void UInventoryComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 	// ...
 }
 
+void UInventoryComponent::SetCurrentEquipment(EEquipmentStates::Type Equipment)
+{
+	switch (Equipment)
+	{
+		case EEquipmentStates::None:
+		{
+
+			break;
+		}
+		case EEquipmentStates::Sword:
+		{
+
+			break;
+		}
+		case EEquipmentStates::Shield:
+		{
+
+			break;
+		}
+		case EEquipmentStates::SandS:
+		{
+
+			break;
+		}
+	}
+	CurrentEquipment = Equipment;
+	OnCurrentEquipmentChanged.Broadcast();
+}
+

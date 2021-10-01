@@ -10,6 +10,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/ArrowComponent.h"
 #include "Camera/CameraComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 
@@ -40,6 +41,20 @@ ACharacterBase::ACharacterBase()
 	CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComponent"));
 	CameraComp->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 
+	/*
+	USkeletalMeshComponent* SomeMesh = GetMesh();
+
+	SwordMesh->CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SwordMesh"));
+	SwordMesh->SetupAttachment(SomeMesh);
+	SwordMesh->SetRelativeRotation(SwordIdleRotation);
+
+	ShieldMesh->CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShieldMesh"));
+	ShieldMesh->SetupAttachment(SomeMesh);
+	ShieldMesh->SetRelativeScale3D(ShieldScale);
+	ShieldMesh->SetRelativeRotation(ShieldIdleRotation);
+	ShieldMesh->SetRelativeLocation(ShieldIdleOffset);
+	*/
+
 
 	TempVisualizer = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Visualizer"));
 	TempVisualizer->SetupAttachment(RootComponent);
@@ -52,6 +67,7 @@ ACharacterBase::ACharacterBase()
 	DebugArrow->bHiddenInGame = false;
 
 	Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
+	Inventory->OnCurrentEquipmentChanged.AddDynamic(this, &ACharacterBase::EquipmentChanged);
 
 
 	GetCapsuleComponent()->SetCapsuleHalfHeight(60.0f);
@@ -73,7 +89,7 @@ void ACharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	NormalScale = TempVisualizer->GetRelativeScale3D();
+	NormalScale = GetMesh()->GetRelativeScale3D();
 
 	IdleState = EIdleSubstates::Stand;
 	RunState = ERunSubstates::Walk;
@@ -106,7 +122,7 @@ void ACharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	//PlayerInputComponent->BindAction("Sprint", IE_Released, this, &ACharacterBase::InputSprintReleased);
 
 	// Jump
-	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacterBase::InputJumpPressed);
+	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacterBase::InputJumpPressed).bExecuteWhenPaused = true;
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacterBase::InputJumpReleased);
 
 	// Rotate Camera
@@ -178,6 +194,12 @@ void ACharacterBase::InputJumpPressed()
 		{
 			InputCancelInteraction();
 		}
+		return;
+	}
+
+	if (PhysicsState == EPhysicsStates::Cinematic
+		|| PhysicsState == EPhysicsStates::Roll)
+	{
 		return;
 	}
 
@@ -281,6 +303,13 @@ void ACharacterBase::InputJumpReleased()
 	{
 		return;
 	}
+
+	if (PhysicsState == EPhysicsStates::Cinematic
+		|| PhysicsState == EPhysicsStates::Roll)
+	{
+		return;
+	}
+
 	bJumpStopRequested = true;
 
 	GetWorldTimerManager().SetTimer(JumpStopRequestHandler, [this]()
@@ -304,7 +333,148 @@ void ACharacterBase::InputJumpReleased()
 
 	}, JumpStopRequestTime, false);
 
+}
 
+void ACharacterBase::InputRoll()
+{
+	if (PhysicsState == EPhysicsStates::Cinematic
+		|| PhysicsState == EPhysicsStates::Jump)
+	{
+		return;
+	}
+
+	if (bCanRoll)
+	{
+		SetPhysicsStates(EPhysicsStates::Roll);
+	}
+}
+
+void ACharacterBase::InputInteraction()
+{
+	if (!IsValid(InteractionActor))
+	{
+		if (IsValid(Inventory))
+		{
+			if (Inventory->CurrentEquipment == EEquipmentStates::None)
+			{
+				Inventory->SetCurrentEquipment(EEquipmentStates::SandS);
+				return;
+			}
+			if (Inventory->CurrentEquipment == EEquipmentStates::SandS)
+			{
+				if (!bIsSwingingSword && !GetWorldTimerManager().IsTimerActive(AttackTimeHandle))
+				{
+					GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Attack!"));
+					bIsSwingingSword = true;
+					GetWorldTimerManager().SetTimer(AttackTimeHandle, [this]()
+					{
+						bIsSwingingSword = false;
+					}, AttackTime, false);
+					return;
+				}
+				else
+				{
+					bIsSwingingSword = false;
+					GetWorldTimerManager().ClearTimer(AttackTimeHandle);
+					FTimerHandle AttackResetHandle;
+					GetWorldTimerManager().SetTimer(AttackResetHandle, [this]()
+					{
+						InputInteraction();
+					}, 0.05f, false);
+					return;
+				}
+			}
+		}
+		return;
+	}
+	else
+	{
+		if (IsValid(Inventory))
+		{
+			if (Inventory->CurrentEquipment != EEquipmentStates::None)
+			{
+				Inventory->SetCurrentEquipment(EEquipmentStates::None);
+				return;
+			}
+		}
+	}
+
+	AChestParent* Chest = Cast<AChestParent>(InteractionActor);
+	if (IsValid(Chest))
+	{
+		Chest->OpenChest();
+		return;
+	}
+
+	ADoorParent* Door = Cast<ADoorParent>(InteractionActor);
+	if (IsValid(Door))
+	{
+		bool bKeyWasUsed = false;
+		if (Door->bIsLocked)
+		{
+			if (!IsValid(ActiveDialogue))
+			{
+				ActiveDialogue = Door->ActiveDialogue;
+				if (IsValid(ActiveDialogue))
+				{
+					if (Inventory->SmallKeys.Num() > 0)
+					{
+						bInteractionIsLocked = true;
+						FTimerHandle LockedHandle;
+						GetWorldTimerManager().SetTimer(LockedHandle, [this]()
+						{
+							bInteractionIsLocked = false;
+						}, 0.1f, false);
+					}
+					SetInteractionType(EInteractionTypes::Confirm);
+					SpawnActiveDialogue();
+					return;
+				}
+			}
+			if (!IsValid(Inventory))
+			{
+				return;
+			}
+			FString RequiredKey = Door->RequiredKeyName;
+			if (Inventory->SmallKeys.Contains(RequiredKey))
+			{
+				Door->OpenDoor(bKeyWasUsed, RequiredKey);
+				if (bKeyWasUsed)
+				{
+					Inventory->SmallKeys.Remove(RequiredKey);
+					UpdateKeyCount();
+					Door->OpenDoor(bKeyWasUsed);
+				}
+			}
+
+			RemoveActiveDialogue();
+			ActiveDialogue = nullptr;
+			SetInteractionType(EInteractionTypes::None);
+
+		}
+		else
+		{
+			Door->OpenDoor(bKeyWasUsed);
+		}
+		return;
+	}
+}
+
+void ACharacterBase::InputCancelInteraction()
+{
+	if (IsValid(ActiveDialogue))
+	{
+		RemoveActiveDialogue();
+		ActiveDialogue = nullptr;
+		if (IsValid(InteractionActor))
+		{
+			SetInteractionType(PreviousInteractableType);
+		}
+		else
+		{
+			SetInteractionType(EInteractionTypes::None);
+		}
+	}
 }
 
 void ACharacterBase::InputCameraRotateLeft()
@@ -313,6 +483,12 @@ void ACharacterBase::InputCameraRotateLeft()
 	{
 		return;
 	}
+
+	if (PhysicsState == EPhysicsStates::Cinematic)
+	{
+		return;
+	}
+
 	float Rotation = CameraBoom->GetRelativeRotation().Yaw;
 	CameraSnapTarget = Rotation - CameraSnapAngle;
 }
@@ -323,6 +499,12 @@ void ACharacterBase::InputCameraRotateRight()
 	{
 		return;
 	}
+
+	if (PhysicsState == EPhysicsStates::Cinematic)
+	{
+		return;
+	}
+
 	float Rotation = CameraBoom->GetRelativeRotation().Yaw;
 	CameraSnapTarget = Rotation + CameraSnapAngle;
 }
@@ -333,6 +515,12 @@ void ACharacterBase::InputCameraReset()
 	{
 		return;
 	}
+
+	if (PhysicsState == EPhysicsStates::Cinematic)
+	{
+		return;
+	}
+
 	float Rotation = GetMesh()->GetRelativeRotation().Yaw + 90.0f;
 	CameraSnapTarget = Rotation;
 }
@@ -343,6 +531,12 @@ void ACharacterBase::TouchStarted(ETouchIndex::Type FingerIndex, FVector Locatio
 	{
 		return;
 	}
+
+	if (PhysicsState == EPhysicsStates::Cinematic)
+	{
+		return;
+	}
+
 	InputTouchLocation = Location;
 	GetWorldTimerManager().SetTimer(SwipeInputHandle, [this]()
 	{
@@ -356,6 +550,12 @@ void ACharacterBase::TouchStopped(ETouchIndex::Type FingerIndex, FVector Locatio
 	{
 		return;
 	}
+
+	if (PhysicsState == EPhysicsStates::Cinematic)
+	{
+		return;
+	}
+
 	bool bSwiped = false;
 	if (GetWorldTimerManager().IsTimerActive(SwipeInputHandle))
 	{
@@ -390,6 +590,13 @@ void ACharacterBase::UpdateMovementInput()
 	{
 		return;
 	}
+
+	if (PhysicsState == EPhysicsStates::Cinematic
+		|| PhysicsState == EPhysicsStates::Roll)
+	{
+		return;
+	}
+
 	FVector CharacterVelocity = GetCharacterMovement()->Velocity;
 	bool bIsInput = false;
 
@@ -504,6 +711,26 @@ void ACharacterBase::SetPhysicsStates(EPhysicsStates::Type State)
 	{
 		// Do something here
 		StateString += TEXT("Jump");
+		break;
+	}
+	case EPhysicsStates::Roll:
+	{
+		FRotator Rotation = GetMesh()->GetComponentRotation();
+		Rotation.Yaw += 90.0f;
+		RollDirection = UKismetMathLibrary::GetForwardVector(Rotation);
+		GetCharacterMovement()->MaxWalkSpeed = RollSpeed;
+		FVector Velocity = RollDirection * RollSpeed;
+		Velocity.Z = 0.0f;
+		GetCharacterMovement()->Velocity = Velocity;
+
+		bRollStart = true;
+		bCanRoll = false;
+
+		FTimerHandle RollHandle;
+		GetWorldTimerManager().SetTimer(RollHandle, [this]()
+		{
+			RollCleanup();
+		}, RollTime, false);
 		break;
 	}
 	}
@@ -792,6 +1019,33 @@ void ACharacterBase::UpdatePhysicsStates(EPhysicsStates::Type State, float Delta
 			}
 			break;
 		}
+		case EPhysicsStates::Roll:
+		{
+			if (CharacterVelocity != FVector(0.0f, 0.0f, 0.0f))
+			{
+				if (CharacterVelocity.Z != 0.0f)
+				{
+					SetPhysicsStates(EPhysicsStates::Jump);
+					GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+				}
+			}
+			else
+			{
+				SetPhysicsStates(EPhysicsStates::Idle);
+				GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+			}
+
+			if (!GetCharacterMovement()->IsMovingOnGround())
+			{
+				SetPhysicsStates(EPhysicsStates::Jump);
+				RollCleanup();
+			}
+
+			FVector Velocity = RollDirection * RollSpeed;
+			Velocity.Z = 0.0f;
+			GetCharacterMovement()->Velocity = Velocity;
+
+		}
 	}
 }
 
@@ -802,6 +1056,35 @@ void ACharacterBase::ResetSubstates()
 	SetJumpSubstates(EJumpSubstates::Rise);
 }
 
+void ACharacterBase::RollCleanup()
+{
+	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+	if (PhysicsState == EPhysicsStates::Roll
+		|| PhysicsState == EPhysicsStates::Jump
+		|| PhysicsState == EPhysicsStates::Idle
+		|| PhysicsState == EPhysicsStates::Cinematic)
+	{
+		GetCharacterMovement()->Velocity = FVector::ZeroVector;
+	}
+	if (PhysicsState == EPhysicsStates::Roll)
+	{
+		// This is probably fine.
+		SetPhysicsStates(EPhysicsStates::Idle);
+	}
+	if (InputForwardValue != 0.0f || InputRightValue != 0.0f)
+	{
+		SetPhysicsStates(EPhysicsStates::Run);
+		FVector Velocity = GetCharacterMovement()->Velocity;
+		Velocity.X = FMath::Clamp(Velocity.X, -1.0f, 1.0f);
+		Velocity.Y = FMath::Clamp(Velocity.Y, -1.0f, 1.0f);
+		Velocity.Z = FMath::Clamp(Velocity.Z, -1.0f, 1.0f);
+		Velocity *= GetCharacterMovement()->MaxWalkSpeed;
+		GetCharacterMovement()->Velocity = Velocity;
+
+	}
+
+	bCanRoll = true;
+}
 
 bool ACharacterBase::JumpReactionDistance()
 {
@@ -836,19 +1119,19 @@ bool ACharacterBase::JumpReactionDistance()
 
 void ACharacterBase::LandingVFX()
 {
-	TempVisualizer->SetRelativeScale3D(LandSquash);
+	GetMesh()->SetRelativeScale3D(LandSquash);
 	ScaleSpeed = SquashSpeed;
 }
 
 void ACharacterBase::LaunchVFX()
 {
-	TempVisualizer->SetRelativeScale3D(JumpStretch);
+	GetMesh()->SetRelativeScale3D(JumpStretch);
 	ScaleSpeed = StretchSpeed;
 }
 
 void ACharacterBase::UpdateScaling(float Delta)
 {
-	FVector Scale = TempVisualizer->GetRelativeScale3D();
+	FVector Scale = GetMesh()->GetRelativeScale3D();
 
 	if (Scale == NormalScale)
 	{
@@ -859,7 +1142,7 @@ void ACharacterBase::UpdateScaling(float Delta)
 	Scale.Y = UStaticsLibrary::Approach(Scale.Y, NormalScale.Y, (ScaleSpeed * Delta));
 	Scale.Z = UStaticsLibrary::Approach(Scale.Z, NormalScale.Z, (ScaleSpeed * Delta));
 
-	TempVisualizer->SetRelativeScale3D(Scale);
+	GetMesh()->SetRelativeScale3D(Scale);
 }
 
 void ACharacterBase::UpdateRotation(float Delta)
@@ -944,91 +1227,6 @@ void ACharacterBase::UpdateKeyCount()
 	}
 }
 
-void ACharacterBase::InputInteraction()
-{
-	if (!IsValid(InteractionActor))
-	{
-		return;
-	}
-
-	AChestParent* Chest = Cast<AChestParent>(InteractionActor);
-	if (IsValid(Chest))
-	{
-		Chest->OpenChest();
-		return;
-	}
-
-	ADoorParent* Door = Cast<ADoorParent>(InteractionActor);
-	if (IsValid(Door))
-	{
-		bool bKeyWasUsed = false;
-		if (Door->bIsLocked)
-		{
-			if (!IsValid(ActiveDialogue))
-			{
-				ActiveDialogue = Door->ActiveDialogue;
-				if (IsValid(ActiveDialogue))
-				{
-					if (Inventory->SmallKeys.Num() > 0)
-					{
-						bInteractionIsLocked = true;
-						FTimerHandle LockedHandle;
-						GetWorldTimerManager().SetTimer(LockedHandle, [this]()
-						{
-							bInteractionIsLocked = false;
-						}, 0.1f, false);
-					}
-					SetInteractionType(EInteractionTypes::Confirm);
-					SpawnActiveDialogue();
-					return;
-				}
-			}
-			if (!IsValid(Inventory))
-			{
-				return;
-			}
-			FString RequiredKey = Door->RequiredKeyName;
-			if (Inventory->SmallKeys.Contains(RequiredKey))
-			{
-				Door->OpenDoor(bKeyWasUsed, RequiredKey);
-				if (bKeyWasUsed)
-				{
-					Inventory->SmallKeys.Remove(RequiredKey);
-					UpdateKeyCount();
-					Door->OpenDoor(bKeyWasUsed);
-				}
-			}
-
-			RemoveActiveDialogue();
-			ActiveDialogue = nullptr;
-			SetInteractionType(EInteractionTypes::None);
-
-		}
-		else
-		{
-			Door->OpenDoor(bKeyWasUsed);
-		}
-		return;
-	}
-}
-
-void ACharacterBase::InputCancelInteraction()
-{
-	if (IsValid(ActiveDialogue))
-	{
-		RemoveActiveDialogue();
-		ActiveDialogue = nullptr;
-		if (IsValid(InteractionActor))
-		{
-			SetInteractionType(PreviousInteractableType);
-		}
-		else
-		{
-			SetInteractionType(EInteractionTypes::None);
-		}
-	}
-}
-
 void ACharacterBase::SetInteractionType(EInteractionTypes::Type Interaction)
 {
 	PreviousInteractableType = InteractableType;
@@ -1051,11 +1249,16 @@ void ACharacterBase::PickupInteraction(FString NamedItem, int ValueItem, TSubcla
 		SetPhysicsStates(EPhysicsStates::Cinematic);
 		SetCinematicSubStates(ECinematicSubstates::Collect);
 		OnItemCollectStarted();
-		float Rotation = GetMesh()->GetRelativeRotation().Yaw + 275.0f;
+		CameraPreviousRotation = CameraBoom->GetComponentRotation().Yaw;
+		FRotator TargetRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), CameraComp->GetComponentLocation());
+
+		float Rotation = TargetRotation.Yaw;
 		CameraSnapTarget = Rotation;
 		FTimerHandle CollectHandle;
 		GetWorldTimerManager().SetTimer(CollectHandle, [this]()
 		{
+			CameraSnapTarget = CameraPreviousRotation;
+			CameraPreviousRotation = 0.0f;
 			SetPhysicsStates(EPhysicsStates::Idle);
 			SetCinematicSubStates(ECinematicSubstates::Idle);
 			OnItemCollectFinished();
@@ -1068,4 +1271,8 @@ void ACharacterBase::PickupInteraction(FString NamedItem, int ValueItem, TSubcla
 
 }
 
+void ACharacterBase::EquipmentChanged()
+{
+	OnEquipmentChanged();
+}
 

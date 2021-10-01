@@ -22,6 +22,7 @@ namespace EPhysicsStates
 		Idle       UMETA(DisplayName = "Idle"),
 		Run        UMETA(DisplayName = "Run"),
 		Jump       UMETA(DisplayName = "Jump"),
+		Roll       UMETA(DisplayName = "Roll"),
 		Cinematic  UMETA(DisplayName = "Cinematic"),
 	};
 }
@@ -110,6 +111,13 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 		class UCameraComponent* CameraComp;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Equipment, meta = (AllowPrivateAccess = "true"))
+		class UStaticMeshComponent* SwordMesh;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Equipment, meta = (AllowPrivateAccess = "true"))
+		class UStaticMeshComponent* ShieldMesh;
+
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 		class UStaticMeshComponent* TempVisualizer;
 
@@ -118,6 +126,23 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
 		class UInventoryComponent* Inventory;
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Equipment")
+		FRotator SwordIdleRotation = FRotator(36.0f, 268.0f, 102.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Equipment")
+		FRotator SwordAttackRotation = FRotator(1.0f, 218.0f, 75.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Equipment")
+		FVector ShieldScale = FVector(0.7f, 0.7f, 0.7f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Equipment")
+		FRotator ShieldIdleRotation = FRotator(-16.0f, -504.0f, 327.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Equipment")
+		FVector ShieldIdleOffset = FVector(0.02f, -0.08f, 0.09f);
+
 
 	UPROPERTY(BlueprintAssignable)
 		FPhysicsStateChanged OnPhysicsStateChanged;
@@ -158,6 +183,15 @@ public:
 		bool bIsSwipe = false;
 
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battle")
+		bool bIsSwingingSword = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battle")
+		float AttackTime = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battle")
+		int AttackCombo = 0;
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enum")
 		TEnumAsByte<EPhysicsStates::Type> PhysicsState;
@@ -173,6 +207,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enum")
 		TEnumAsByte<ECinematicSubstates::Type> CinematicState;
+
+	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enum")
+		//TEnumAsByte<EEquipmentStates::Type> CurrentEquipment;
 
 
 
@@ -199,6 +236,25 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Walk/Run")
 		bool bCanSprint = true;
+
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roll")
+		FVector RollDirection;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roll")
+		bool bRollStart = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roll")
+		float RollTime = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roll")
+		float RollSpeed = 1000.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roll")
+		bool bCanRoll = true;
+
+
 
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "States")
@@ -269,6 +325,8 @@ public:
 
 	FTimerHandle SwipeInputHandle;
 
+	FTimerHandle AttackTimeHandle;
+
 
 	// Procedural Animations
 
@@ -303,6 +361,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
 		float CameraResetSpeed = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+		float CameraPreviousRotation = 0.0f;
 
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction")
@@ -362,6 +423,8 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void InputJumpReleased();
 	UFUNCTION(BlueprintCallable)
+	void InputRoll();
+	UFUNCTION(BlueprintCallable)
 	void InputCameraRotateLeft();
 	UFUNCTION(BlueprintCallable)
 	void InputCameraRotateRight();
@@ -378,6 +441,7 @@ public:
 	void SetCinematicSubStates(ECinematicSubstates::Type State);
 	void UpdatePhysicsStates(EPhysicsStates::Type State, float Delta);
 	void ResetSubstates();
+	void RollCleanup();
 	
 	void CheckJumps();
 
@@ -426,5 +490,10 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void PickupInteraction(FString NamedItem, int ValueItem, TSubclassOf<AActor> ActorItem);
 
+	UFUNCTION()
+	void EquipmentChanged();
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnEquipmentChanged();
 
 };
