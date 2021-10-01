@@ -14,7 +14,7 @@ So far, I haven't mode a whole lot of progress, as this is a low-priority, side 
 - Keys
 - Prompts
 - Cinematic item collection sequence
-- VERY basic attack
+- VERY basic attacks, hardly worth mentioning
 - Simple, code-driven squash/stretch procedural animation for jumping/landing
 - Mobile friendly controls and gestures 
 &nbsp; 
@@ -62,7 +62,7 @@ I did not make any of the assets, BUT I made the extra animations for the Fox ch
 &nbsp; 
 &nbsp; 
 
-### Some Android Debugging with gesture tracking
+### Some Android Debugging with Gesture Tracking
 ![Preview](https://github.com/VinnNo/SimplePlatformer/blob/f2ed2b403ae870d12f8772a49012ec2ee6b5f0cd/Examples/AndroidDebug.gif) 
 &nbsp; 
 &nbsp; 
