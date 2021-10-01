@@ -13,7 +13,8 @@ void UWInGameHud::UpdateSmallKeyCount(int Value)
 {
 	if (SmallKeyCountLabel)
 	{
-		FString StringValue = FString::FromInt(Value);
+		FString StringValue = TEXT("x");
+		StringValue += FString::FromInt(Value);
 		FText TextValue = FText::FromString(StringValue);
 		SmallKeyCountLabel->SetText(TextValue);
 	}

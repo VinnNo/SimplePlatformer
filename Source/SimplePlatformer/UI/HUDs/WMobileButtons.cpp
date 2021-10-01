@@ -5,6 +5,8 @@
 
 #include "Kismet/GameplayStatics.h"
 
+#include "Styling/SlateColor.h"
+
 #include "Engine.h"
 
 UWMobileButtons::UWMobileButtons(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -73,56 +75,52 @@ void UWMobileButtons::UpdateBSupportImage()
 void UWMobileButtons::UpdateInteractionType(EInteractionTypes::Type Interaction, bool bSetAToCancel)
 {
 	if (InteractionType == Interaction
-	|| ActionBSupportImage == nullptr)
+	|| ActionASupportText == nullptr
+	|| ActionBSupportText == nullptr)
 	{
 		return;
 	}
-
-	FLinearColor ColorVisible = FLinearColor(1.0f, 1.0f, 1.0f, 1.0f);
-	FLinearColor ColorHidden = FLinearColor(1.0f, 1.0f, 1.0f, 0.0f);
-	//FSlateColor ColorVisible(1.0f, 1.0f, 1.0f, 1.0f);// = FSlateColor(1.0f, 1.0f, 1.0f, 1.0f);
-	//FSlateColor ColorHidden = FSlateColor(1.0f, 1.0f, 1.0f, 0.0f);
-
-	ActionASupportImage->SetColorAndOpacity(ColorHidden);
+	ActionASupportText->SetRenderOpacity(0.0f);
 
 	switch (Interaction)
 	{
 		case EInteractionTypes::None:
 		{
-			ActionBSupportImage->SetColorAndOpacity(ColorHidden);
+			ActionBSupportText->SetRenderOpacity(0.0f);
 			break;
 		}
 		case EInteractionTypes::Open:
 		{
-			ActionBSupportImage->SetBrushFromTexture(OpenTexture);
+			ActionBSupportText->SetText(FText::FromString(TEXT("Open")));
 			break;
 		}
 		case EInteractionTypes::Grab:
 		{
-			ActionBSupportImage->SetBrushFromTexture(GrabTexture);
+			ActionBSupportText->SetText(FText::FromString(TEXT("Grab")));
 			break;
 		}
 		case EInteractionTypes::Drop:
 		{
-			ActionBSupportImage->SetBrushFromTexture(DropTexture);
+			ActionBSupportText->SetText(FText::FromString(TEXT("Drop")));
 			break;
 		}
 		case EInteractionTypes::Throw:
 		{
-			ActionBSupportImage->SetBrushFromTexture(ThrowTexture);
+			ActionBSupportText->SetText(FText::FromString(TEXT("Throw")));
 			break;
 		}
 		case EInteractionTypes::Confirm:
 		{
-			ActionBSupportImage->SetBrushFromTexture(OpenTexture);
-			ActionASupportImage->SetBrushFromTexture(CancelTexture);
-			ActionASupportImage->SetColorAndOpacity(ColorVisible);
+			ActionBSupportText->SetText(FText::FromString(TEXT("Open")));
+			ActionASupportText->SetText(FText::FromString(TEXT("Cancel")));
+			ActionASupportText->SetRenderOpacity(1.0f);
+
 		}
 	}
 
 	if (Interaction != EInteractionTypes::None)
 	{
-		ActionBSupportImage->SetColorAndOpacity(ColorVisible);
+		ActionBSupportText->SetRenderOpacity(1.0f);
 	}
 }
 
