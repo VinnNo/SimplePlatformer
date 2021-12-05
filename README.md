@@ -1,7 +1,7 @@
 # Nostalgia and Curiosity
 As a huge fan of the Nintendo 64 and some of its most popular titles, I wanted to get some handles on how to implement some of the gameplay features from Mario 64 and Legend of Zelda that made them feel soooo good. My goal is to recreate these amazing features and pack them into a simple control-scheme as to be easy to add intuitive touch-screen controls.. For some reason.
 
-So far, I haven't mode a whole lot of progress, as this is a low-priority, side project BUT here's the features we're looking at:
+So far, I haven't made a whole lot of progress, as this is a low-priority, side project BUT here's the features we're looking at:
 
 - Relative to camera movement
 - Camera rotation and reset rotation controls
